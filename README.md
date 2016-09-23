@@ -2,7 +2,7 @@
 This is an Augmented Reality Android app. It detects and tracks the user's hand in real time and augments a rotating cube on top of it.
 The rotation speed can be set by the user by holding up the corresponding number of fingers.
 
-Watch video <a href="https://www.youtube.com/watch?v=zdT33t92WN0&feature=youtu.be"> here</a>.
+**Watch video <a href="https://www.youtube.com/watch?v=zdT33t92WN0&feature=youtu.be"> here</a>.**
 
 
 <img src="https://github.com/ad8454/Hand-Detection-AR/blob/master/ar_stage.JPG" width="600">
