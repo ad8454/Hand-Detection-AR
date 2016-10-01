@@ -1,7 +1,6 @@
 /***
  *
- *  Cube implementation as provided by the OpenGL sample library
- *
+ * Cube implementation as provided by the OpenGL sample library
  *
  */
 

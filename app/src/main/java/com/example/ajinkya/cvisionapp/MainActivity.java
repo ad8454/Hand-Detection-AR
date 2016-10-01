@@ -1,7 +1,13 @@
-/***
- * @author: Ajinkya Dhaigude
+/**
+ * The main and only activity in the app. The class opens
+ * up a camera view in landscape mode of the dimensions 
+ * specified. Upon user input, it computes the anchor point
+ * for augmenting the cube and renders it.
+ *
+ *
+ * @author  Ajinkya Dhaigude
  */
-
+ 
 package com.example.ajinkya.cvisionapp;
 
 import android.app.ActionBar;
@@ -61,9 +67,11 @@ import javax.microedition.khronos.opengles.GL10;
 
 public class MainActivity extends AppCompatActivity implements CvCameraViewListener2 {
 
+	// declare global variables.
+	// Reuse OpenCV instances like Mat because creating new objects is expensive
     private JavaCameraView javaCameraView;
     private Mat ycc;
-    private int camDim[] = {320, 240};          // could be better
+    private int camDim[] = {320, 240};          // TODO: higher resolution
     private float offsetFactX, offsetFactY;
     private float scaleFactX, scaleFactY;
     private boolean handDetected = false;
@@ -93,20 +101,22 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     private int speedFingers = 0;
 
 
+	// Initial check for OpenCV
     static {
         if (!OpenCVLoader.initDebug())
-            Log.e("init", "noo");
+            Log.e("init", "OpenCV NOT loaded");
         else
-            Log.e("init", "yess");
+            Log.e("init", "OpenCV successfully loaded");
     }
 
+	// anonymous class for initializing loader callback
     private BaseLoaderCallback baseLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
             switch (status) {
                 case LoaderCallbackInterface.SUCCESS:
                 {
-                    Log.i("START!!!", "OpenCV loaded successfully");
+                    Log.i("Start", "OpenCV callback successful");
                     javaCameraView.enableView();
                 } break;
                 default:
@@ -117,11 +127,15 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         }
     };
 
+	
+	/**
+	 * Called only once on app start up
+	 */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);			// prevent screen from going to sleep
         View decorView = getWindow().getDecorView();
         int uiOptions = View.SYSTEM_UI_FLAG_FULLSCREEN;
         decorView.setSystemUiVisibility(uiOptions);
@@ -134,6 +148,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         javaCameraView.setMaxFrameSize(camDim[0], camDim[1]);
 
 
+		// set up OpenGL view
         GLSurfaceView myGLView = new GLSurfaceView(this);
         myGLView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
         myGLView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
@@ -144,6 +159,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         myGLView.setZOrderMediaOverlay(true);
     }
 
+	
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -179,6 +195,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
     @Override
     public void onCameraViewStarted(int width, int height) {
+		// initialize global variables on camera start
+		
         setScaleFactors(width, height);
         myGLRenderer.setVidDim(camDim[0], camDim[1]);
         ycc = new Mat(height, width, CvType.CV_8UC3);
@@ -208,95 +226,41 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
     @Override
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-
+		// called for every frame on video feed
+		
         ycc = inputFrame.rgba();
-        //Imgproc.GaussianBlur(ycc, ycc, new Size(9, 9), 0);
-//        Imgproc.threshold(ycc, ycc, 70, 255, Imgproc.THRESH_BINARY_INV+Imgproc.THRESH_OTSU);
-        //
         if (handDetected) {
-
-            //return frame;
-
+			// clone frame beacuse original frame needed for display
             frame = ycc.clone();
-//            for(int i=0; i<allRoi.size(); i++){
-//                Rect roi = motionTrack(frame, allRoi.get(i), allRoiHist.get(i)); // change to frame
-//                allRoi.set(i, roi);
-//                Imgproc.rectangle(ycc, roi.tl(), roi.br(), new Scalar(255, 0, 255), 3);
-//            }
-//
 
+			// remove noise and convert to binary in HSV range determined by user input
             Imgproc.GaussianBlur(frame, frame, new Size(9, 9), 5);
             Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGB2HSV_FULL);
             Core.inRange(frame, minHSV, maxHSV, frame);
 
 //            Point palm = getDistanceTransformCenter(frame);
-//            myGLRenderer.setPos(palm.x, palm.y);
-//
-//
-//            // new: maybe move to function
-//            frame = ycc.clone();
-//            double avgHSV[] = getAvgHSV(frame, (int)palm.x, (int)palm.y, frame.rows(), frame.cols());
-//            assignHSV(avgHSV);
 
-
-            //TODO: check if needs to be released
+			// get all possible contours and then determine palm contour
             contours =  getAllContours(frame);
             int indexOfPalmContour = getPalmContour(contours);
+			
             if(indexOfPalmContour < 0)
-                myGLRenderer.setRenderCube(false);
+                myGLRenderer.setRenderCube(false);		// no palm in frame
             else{
-
+				// get anchor point for cube rendering
                 Point palm = getDistanceTransformCenter(frame);
-//                Imgproc.circle(ycc, palm, 6, new Scalar(25, 120, 255));
                 myGLRenderer.setPos(palm.x, palm.y);
                 Rect roi = Imgproc.boundingRect(contours.get(indexOfPalmContour));
+				
+				// set cube scale
                 myGLRenderer.setCubeSize(getEuclDistance(palm, roi.tl()));
 
-//                palmContour = contours.get(indexOfPalmContour);
-//                List<Point> listHullPoints = getConvexHullPoints(palmContour);
-//                //Log.e("hull size ------>", hullPoints.size()+"");
-//                contours.clear();
-//                Point hullArray[] = new Point[listHullPoints.size()];
-//                listHullPoints.toArray(hullArray);
-//                hullPoints = new MatOfPoint(hullArray);
-//                contours.add(hullPoints);
-//                contours.add(palmContour);
-//                // draw convex hull
-//                Imgproc.drawContours(ycc, contours, 0, new Scalar(0, 255, 0));
-//                Imgproc.drawContours(ycc, contours, 1, new Scalar(0, 0, 255));
-//
-//
-//
-//                // new: maybe move to function
-////                frame = ycc.clone();
-////                getAvgHSV(frame);
-//
-//
-//                Imgproc.rectangle(ycc, roi.tl(), roi.br(), new Scalar(0, 0, 255), 1);
-//                Log.e("mop", contours.get(indexOfPalmContour).dims() + "    " + contours.get(0).get(0, 0).length);
-//
-//                Imgproc.convexityDefects(palmContour, hull, convexityDefects);
-//                List<Integer> defectIndices = getDefects(convexityDefects.toList());
-//                Point palmContourPoints[] = palmContour.toArray();
-////                Log.e("defects -->", defectIndices.size()+"");
-//
-//                List<Point> defectPoints = new ArrayList<>();
-//                for(int i=0; i<defectIndices.size(); i+=4) {
-//                    Imgproc.circle(ycc, palmContourPoints[defectIndices.get(i + 2)], 6, new Scalar(255, 105, 185));
-//                    defectPoints.add(palmContourPoints[defectIndices.get(i + 2)]);
-//                }
-//                Point defectArray[] = new Point[defectPoints.size()];
-//                defectPoints.toArray(defectArray);
-//                hullPoints = new MatOfPoint(defectArray);
-//                contours.add(0, hullPoints);
-//                Imgproc.drawContours(ycc, contours, 0, new Scalar(254, 10, 0));
-
-
-
-                List<Point> hullPoints = getConvexHullPoints(contours.get(indexOfPalmContour)); //1   //indexOfPalmContour
+				// get finger tips for gesture recognition
+                List<Point> hullPoints = getConvexHullPoints(contours.get(indexOfPalmContour));
                 fingers = getFingersTips(hullPoints, frame.rows());
                 Collections.reverse(fingers);
 
+				// set cube rotation speed
                 int fSize = fingers.size();
                 if(fSize != speedFingers){
                     speedFingers = fSize;
@@ -306,58 +270,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
                     speedTime++;
                 if(speedTime > 8)
                     myGLRenderer.setCubeRotation(fSize);
-                Log.e("speed", speedTime+"  "+fSize);
-
-//                for(int i=0; i<fingers.size(); i++) {
-////                    Log.e("in f", getEuclDistance(fingers.get(i), palmCenter)+"");
-//                    Imgproc.circle(ycc, fingers.get(i), 6, new Scalar(255, 0, 0));
-//                    Imgproc.putText(ycc, fingers.get(i).x+" "+fingers.get(i).y, fingers.get(i), 1, 0.7, new Scalar(25, 0, 250) );
-//                }
-
             }
-
-
-
-
-
-            // convex defects and moment mass
-//            Imgproc.convexityDefects(maxContour, hull, convexityDefects);
-//            List<Integer> defectIndices = convexityDefects.toList();
-//
-//            Moments mont = Imgproc.moments(contours.get(0));
-//            int x = (int) (mont.get_m10() / mont.get_m00());
-//            int y = (int) (mont.get_m01() / mont.get_m00());
-//            Point palm = new Point(x, y);
-//            Imgproc.circle(ycc, palm, 6, new Scalar(25, 120, 255));
-
-
-
-//
-
-
-
-
-            //ycc = getDistanceTransformCenter(ycc);
-
-
-//                contours.add(new MatOfPoint());
-//                contours.get(contours.size()-1).fromList(hullPoints);
-//                Imgproc.drawContours(frame, tempContours, tempIndex, new Scalar(0, 255, 0));
-//
-//                // Bounded Rectangle
-//                Rect roi = Imgproc.boundingRect(contours.get(indexOfMaxContour));
-//                Imgproc.rectangle(frame, roi.tl(), roi.br(), new Scalar(0, 0, 255), 3);
-//                Log.e("mop", contours.get(0).dims() + "    " + contours.get(0).get(0, 0).length);
-//
-//                 //   Rotated Rectangle
-//                RotatedRect box = Imgproc.minAreaRect(new MatOfPoint2f(contours.get(indexOfMaxContour).toArray()));
-//                Point corners[] = new Point[4];
-//                box.points(corners);
-//                for(int i=0; i<4; ++i) {
-//                    Imgproc.line(frame, corners[i], corners[(i + 1) % 4], new Scalar(255, 0, 0));
-//               }
-//            return frame;
-//            }
             return ycc;
         }
         return ycc;
@@ -365,6 +278,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
     @Override
     public void onCameraViewStopped() {
+		// release all resources on camera close
         frame.release();
         ycc.release();
         ranges.release();
@@ -393,97 +307,47 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
             frame = ycc.clone();
             Imgproc.GaussianBlur(frame, frame, new Size(9, 9), 5);
 
-            // calc x, y coords coz resolution is scaled on device display
+            // calculate x, y coords because resolution is scaled on device display
             int x = Math.round((event.getX() - offsetFactX) * scaleFactX) ;
             int y = Math.round((event.getY() - offsetFactY) * scaleFactY);
 
             int rows = frame.rows();
             int cols = frame.cols();
 
+			// reurn if touched point is outside camera resolution
             if ((x < 0) || (y < 0) || (x > cols) || (y > rows)) return false;
 
+			// set palm center point and average HSV value
             palmCenter.x = x;
             palmCenter.y = y;
 
-//            int xx = (int)((0 / scaleFactX)+ offsetFactX);
-//            int yy = (int)((0 / scaleFactY)+ offsetFactY);
-//
-//            Log.e("1st", xx+"  "+yy);
-//
-//            xx = (int)((320 / scaleFactX)+ offsetFactX);
-//            yy = (int)((240 / scaleFactY)+ offsetFactY);
-//
-//            Log.e("2nd", xx+"  "+yy);
-
-            // get average HSV values of a square patch around the touched pixel
-            // and store them in global variables
-
             getAvgHSV(frame);
-
-
-            // do below stuff in real time
-
-
-//            // to get palm center: do better coz image patch was in HSV earlier
-              // Needs work. Maybe find mean of all points
-//            Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGB2HSV_FULL);
-//            Core.inRange(frame, minHSV, maxHSV, frame);
-//
-//
-//
-//////            basePoint = getDistanceTransformCenter(ycc);
-////            basePoint = new Point(x, y);
-////
-//            List<MatOfPoint> contours =  getAllContours(frame);
-//            int indexOfMaxContour = getIndexOfMaxContour(contours);
-//            List<Point> hullPoints = getConvexHullPoints(contours.get(indexOfMaxContour));
-//            fingers = getFingersTips(hullPoints, rows);
-//            Collections.reverse(fingers);   // thumb is 0
-//
-//
-//
-//            //************test***********
-////            //Imgproc.drawContours(frame, contours, indexOfMaxContour, new Scalar(255, 0, 0));
-////            frame = ycc.clone();
-////            Point hullArray[] = new Point[hullPoints.size()];
-////            hullPoints.toArray(hullArray);
-////            contours.add(new MatOfPoint(hullArray));
-////            //contours.get(contours.size()-1).fromList(hullPoints);
-////            Imgproc.drawContours(frame, contours, contours.size()-1, new Scalar(0, 255, 0));
-////
-////
-//
-//
-//
-//
-//            for(int i=0; i<fingers.size(); i++){
-//                allRoi.add(new Rect());
-//                allRoiHist.add(new Mat());
-//                assignRoiHist(fingers.get(i), ycc, allRoi.get(i), allRoiHist.get(i));
-//            }
-
 
             handDetected = true;
         }
         return false;
     }
 
+	/**
+	 * Method to get convex hull defects.
+	 */
     protected List<Integer> getDefects(List<Integer> defectIndicesOld){
         int thresh = 800;
         int prevDepth = 0;
         List<Integer> defectIndices = new ArrayList<Integer>();
         for(int i = 0; i<defectIndicesOld.size(); i+=4) {
             int curDepth = defectIndicesOld.get(i+3);
-//            Log.e("depth", i+"  "+curDepth);
-//            if (curDepth < prevDepth)
-//                defectIndices.addAll(defectIndicesOld.subList(i-4, i));
-//            prevDepth = curDepth;
             if(curDepth > thresh)
                 defectIndices.addAll(defectIndicesOld.subList(i, i+4));
         }
         return defectIndices;
     }
 
+	
+	/**
+	 * Method that uses mean shift algorithm to track each finger tip.
+	 * Not used beacuse not robust.
+	 */
     protected Rect motionTrack(Mat frame, Rect roi, Mat roiHist){
         Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGB2HSV_FULL);
 
@@ -496,6 +360,10 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         return roi;
     }
 
+	
+	/**
+	 * Method to compute and assign histogram of given Region of Interest.
+	 */
     protected void assignRoiHist(Point point, Mat frame, Rect roi, Mat roiHist){
         int halfSide = 10;
         roi.x = ((int) point.x - halfSide > 0)? (int) point.x - halfSide : 0;
@@ -503,7 +371,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         roi.width = (2 * halfSide < frame.width())? 2 * halfSide : frame.width();
         roi.height = (2 * halfSide < frame.height())? 2 * halfSide : frame.height();
 
-        Log.e("roi", roi.x+" "+roi.y+" "+roi.width+" "+roi.height);
+        //Log.e("roi", roi.x+" "+roi.y+" "+roi.width+" "+roi.height);
 
         Mat submat = frame.submat(roi);
         Mat mask = new Mat();
@@ -521,6 +389,11 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         histSize.release();
     }
 
+	
+	/**
+	 * Method to compute and return strongest point of distance transform.
+	 * For a binary image with palm in white, strongest point will be the palm center.
+	 */
     protected Point getDistanceTransformCenter(Mat frame){
 
         Imgproc.distanceTransform(frame, frame, Imgproc.CV_DIST_L2, 3);
@@ -529,7 +402,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         Imgproc.threshold(frame, frame, 254, 255, Imgproc.THRESH_TOZERO);
         Core.findNonZero(frame, nonZero);
 
-        // are you kidding me
+        // have to manually loop through matrix to calculate sums
         int sumx = 0, sumy = 0;
         for(int i=0; i<nonZero.rows(); i++) {
             sumx += nonZero.get(i, 0)[0];
@@ -541,6 +414,10 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         return new Point(sumx, sumy);
     }
 
+	
+	/**
+	 * Method to get number of fingers being help up in palm image
+	 */
     protected List<Point> getFingersTips(List<Point> hullPoints, int rows){
         // group into clusters and find distance between each cluster. distance should approx be same
         double betwFingersThresh = 80;
@@ -549,33 +426,38 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         List<Point> fingerTips  = new ArrayList<>();
         for(int i=0; i<hullPoints.size(); i++){
             Point point = hullPoints.get(i);
-            if(rows - point.y < thresh){ //betwFingersThresh     // lies very near frame edge hence arm
-                   // || getEuclDistance(point, palmCenter) < distFromCenterThresh) {
-//                Log.e("dist", getEuclDistance(point, palmCenter)+"");
+            if(rows - point.y < thresh)
                 continue;
-            }
             if(fingerTips.size() == 0){
                 fingerTips.add(point);
                 continue;
             }
             Point prev = fingerTips.get(fingerTips.size() - 1);
             double euclDist = getEuclDistance(prev, point);
+			
             if(getEuclDistance(prev, point) > thresh/2 &&
-                    getEuclDistance(palmCenter, point) > thresh) {
-//                Log.e("be f", euclDist+"");
+                    getEuclDistance(palmCenter, point) > thresh)
                 fingerTips.add(point);
-            }
+				
             if(fingerTips.size() == 5)  // prevent detection of point after thumb
                 break;
         }
         return fingerTips;
     }
 
+	
+	/**
+	 * Method to get eucledean distance between two points.
+	 */
     protected double getEuclDistance(Point one, Point two){
         return Math.sqrt(Math.pow((two.x - one.x), 2)
                 + Math.pow((two.y - one.y), 2));
     }
 
+	
+	/**
+	 * Method to get convex hull points.
+	 */
     protected List<Point> getConvexHullPoints(MatOfPoint contour){
         Imgproc.convexHull(contour, hull);
         List<Point> hullPoints = new ArrayList<>();
@@ -585,21 +467,27 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         return hullPoints;
     }
 
+	
+	/**
+	 * Method to get contour of palm. Computed by the 
+	 * knowledge that palm center has to lie inside it.
+	 */
     protected int getPalmContour(List<MatOfPoint> contours){
 
         Rect roi;
         int indexOfMaxContour = -1;
-//        int currentMax = 0;
         for (int i = 0; i < contours.size(); i++) {
             roi = Imgproc.boundingRect(contours.get(i));
             if(roi.contains(palmCenter))
                 return i;
-//            if (contours.get(i).dims() > currentMax)
-//                indexOfMaxContour = i;
         }
         return indexOfMaxContour;
     }
 
+	
+	/**
+	 * Method to get all possible contours in binary image frame.
+	 */
     protected List<MatOfPoint> getAllContours(Mat frame){
         frame2 = frame.clone();
         List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
@@ -607,9 +495,13 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         return contours;
     }
 
+	
+	/**
+	 * Method to assign average HSV value of palm
+	 */
     protected void getAvgHSV(Mat frame){
+		
         // consider square patch around touched pixel
-
         int x = (int) palmCenter.x;
         int y = (int) palmCenter.y;
         int rows = frame.rows();
@@ -637,6 +529,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         assignHSV(avgHSV);
     }
 
+	/**
+	 * Method to assign range of HSV values of palm
+	 */
     protected void assignHSV(double avgHSV[]){
         minHSV.val[0] = (avgHSV[0] > 10) ? avgHSV[0] - 10 : 0;
         maxHSV.val[0] = (avgHSV[0] < 245) ? avgHSV[0] + 10 : 255;
@@ -660,6 +555,9 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         return ycc;
     }
 
+	/**
+	 * Method to set scale factors for coordinate translation
+	 */
     protected void setScaleFactors(int vidWidth, int vidHeight){
         float deviceWidth = javaCameraView.getWidth();
         float deviceHeight = javaCameraView.getHeight();
