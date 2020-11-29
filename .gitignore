@@ -1,13 +1,13 @@
+# Ignore IDE files
+/.idea/
+
+# Ignore build artifacts
 *.iml
-.gradle
-/local.properties
-/.idea/workspace.xml
-/.idea/libraries
-.DS_Store
-/build
-/captures
-/openCVTutorial2MixedProcessing
-/openCVLibrary310
-.idea/
-gradle.properties
 *.log
+.gradle
+/build/
+/captures/
+
+# Ignore local properties
+/local.properties
+gradle.properties
