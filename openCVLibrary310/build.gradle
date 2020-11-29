@@ -13,9 +13,4 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
     }
-
-    // We'll ignore linter warning of this project since openCVLibrary310 is vendored library codes
-    lintOptions {
-        abortOnError false
-    }
 }

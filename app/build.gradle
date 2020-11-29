@@ -16,11 +16,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-
-    // TODO: Don't ignore lint warnings and fix call of deprecated APIs
-    lintOptions {
-        checkReleaseBuilds false
-    }
 }
 
 dependencies {
