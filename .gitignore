@@ -1,4 +1,5 @@
 # Ignore build artifacts
 /.gradle/
+/build/
 /app/build/
 /openCVLibrary310/build/
