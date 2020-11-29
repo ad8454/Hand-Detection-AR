@@ -6,6 +6,7 @@
 *.log
 .gradle
 /build/
+/openCVLibrary310/build/
 /captures/
 
 # Ignore local properties
