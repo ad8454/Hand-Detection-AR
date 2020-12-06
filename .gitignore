@@ -1,13 +1,5 @@
-*.iml
-.gradle
-/local.properties
-/.idea/workspace.xml
-/.idea/libraries
-.DS_Store
-/build
-/captures
-/openCVTutorial2MixedProcessing
-/openCVLibrary310
-.idea/
-gradle.properties
-*.log
+# Ignore build artifacts
+/.gradle/
+/build/
+/app/build/
+/openCVLibrary310/build/
